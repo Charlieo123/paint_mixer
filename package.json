@@ -1,0 +1,41 @@
+{
+  "name": "system3colourmix",
+  "version": "1.0.0",
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/react-native-action-sheet": "^4.1.0",
+    "@react-native-community/slider": "^4.5.3",
+    "axios": "^1.7.7",
+    "expo": "~51.0.28",
+    "expo-camera": "^15.0.16",
+    "expo-file-system": "^17.0.1",
+    "expo-image-manipulator": "^12.0.5",
+    "expo-image-picker": "~15.0.7",
+    "expo-linear-gradient": "^13.0.2",
+    "expo-pixi": "^2.1.1",
+    "expo-status-bar": "~1.12.1",
+    "pixi.js": "^8.4.1",
+    "prop-types": "^15.8.1",
+    "react": "18.2.0",
+    "react-color": "^2.19.3",
+    "react-native": "0.74.5",
+    "react-native-action-sheet": "^2.2.0",
+    "react-native-canvas": "^0.1.40",
+    "react-native-color-picker": "^0.6.0",
+    "react-native-fs": "^2.20.0",
+    "react-native-image-picker": "^7.1.2",
+    "react-native-pixel-color": "^0.0.5",
+    "react-native-webview": "13.8.6",
+    "react-native-wheel-color-picker": "^1.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0"
+  },
+  "private": true
+}
