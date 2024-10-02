@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Button, StyleSheet, Image } from 'react-native';
 import axios from 'axios';
 import ColourWheel from './colourWheel';
 import ColourSelect from './colourSelect';
@@ -69,12 +69,18 @@ export default class App extends Component {
     const { showColourWheel, showColourSelect, selectedColour, showColourDisplay, lighterMix, actualMix, darkerMix } = this.state;
 
     return (
+
       <View style={styles.container}>
         {!showColourWheel && !showColourSelect && (
-          <View>
-            <Button title="Select Colour" onPress={this.handleSelectColour} />
-            <Button title="Upload Photo" onPress={this.handleUploadPhoto} />
-          </View>
+          <View style={styles.buttonContainer}>
+          <Image
+            source={require('./Craft_mode.jpeg')} 
+            style={styles.image}
+            resizeMode="contain" 
+          />
+          <Button title="Select Colour" onPress={this.handleSelectColour} />
+          <Button title="Upload Photo" onPress={this.handleUploadPhoto} />
+        </View>
         )}
 
         {showColourWheel && (
@@ -104,6 +110,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    marginTop: 50,
+    marginTop: 30,
+  },
+  image: {
+    width: 200,    // Adjust the width as needed
+    height: 200,   // Adjust the height as needed
+    marginBottom: 20, // Space between image and buttons
+  },
+  buttonContainer: {
+    alignItems: 'center', // Center buttons horizontally
+    marginBottom: 30,
   },
 });
