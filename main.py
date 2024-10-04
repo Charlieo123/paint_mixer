@@ -10,16 +10,34 @@ CORS(app)
 
 output = ''
 available_colors = {
-    'Mars Black': {'rgba': (16, 8, 1, 1.0), 'lightfastness': 10},
-    'Titanium White': {'rgba': (236, 242, 249, 1.0), 'lightfastness': 10},
-    'Emerald': {'rgba': (0, 123, 38, 0.9), 'lightfastness': 7},
-    'Lemon Yellow': {'rgba': (238, 222, 0, 0.9), 'lightfastness': 7},
-    'Ultramarine': {'rgba': (12, 65, 155, 0.9), 'lightfastness': 10},
-    'Crimson': {'rgba': (192, 0, 32, 0.9), 'lightfastness': 7},
-    'Yellow Ochre': {'rgba': (209, 128, 0, 0.9), 'lightfastness': 10},
+    'Black': {'rgba': (23, 23, 23, 1.0), 'lightfastness': 10},
+    'Titanium White': {'rgba': (245, 245, 245, 1.0), 'lightfastness': 10},
+    'Emerald Green': {'rgba': (0, 164, 123, 0.95), 'lightfastness': 7},
+    'Lemon Yellow': {'rgba': (238, 222, 2, 0.95), 'lightfastness': 7},
+    'Ultramarine': {'rgba': (0, 44, 175, 0.95), 'lightfastness': 10},
+    'Phthalo Blue': {'rgba': (80, 144, 242, 0.95), 'lightfastness': 10},
+    'Cerulean Blue': {'rgba': (0, 147, 248, 0.95), 'lightfastness': 10},
+    'Cobalt Blue': {'rgba': (0, 130, 226, 0.95), 'lightfastness': 10},
+    'Perm Blue Violet': {'rgba': (84, 50, 92, 0.95), 'lightfastness': 10},
+    'Crimson Red': {'rgba': (255, 26, 26, 1), 'lightfastness': 7},
+    'Carmine': {'rgba': (182, 0, 13, 1), 'lightfastness': 7},
+    'Rose': {'rgba': (218, 58, 76, 0.95), 'lightfastness': 7},
+    'Orange': {'rgba': (239, 118, 32, 0.95), 'lightfastness': 7},
+    'Grey': {'rgba': (225, 209, 196, 0.95), 'lightfastness': 7},
+    'Green Pale': {'rgba': (0, 145, 101, 0.95), 'lightfastness': 10},
+    'Raw Umber': {'rgba': (92, 43, 10, 0.95), 'lightfastness': 10},
+    'Yellow Ochre': {'rgba': (215, 160, 65, 0.95), 'lightfastness': 10},
+    'Gold Ochre': {'rgba': (231, 144, 29, 0.95), 'lightfastness': 10},
+    'Raw Sienna': {'rgba': (211, 138, 62, 0.95), 'lightfastness': 10},
+    'Burnt Sienna': {'rgba': (200, 98, 53, 0.95), 'lightfastness': 10},
+    'Naples Yellow': {'rgba': (245, 222, 81, 0.95), 'lightfastness': 10},
     'Cadmium Yellow': {'rgba': (246, 210, 5, 0.9), 'lightfastness': 7},
     'Burnt Umber': {'rgba': (50, 23, 0, 1.0), 'lightfastness': 10},
-    'Cadmium Red': {'rgba': (222, 42, 34, 0.9), 'lightfastness': 7},
+    'Vermilion': {'rgba': (244, 29, 4, 0.95), 'lightfastness': 7},
+    'Viridian': {'rgba': (8, 54, 57, 0.95), 'lightfastness': 10},
+    'Fluorescent Peach Red': {'rgba': (255, 112, 177, 0.95), 'lightfastness': 10},
+
+
 }
 color_names = list(available_colors.keys())
 
@@ -154,7 +172,7 @@ def optimize_mixing_ratios(target_rgba, selected_paints, max_paints=4):
 def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared_color=None, max_paints=4):
     mix_ratios = {color: 0 for color in available_colors}
     color_order = []
-    excluded_colors = ['Mars Black'] if light_mix else ['Titanium White']  # Avoid Mars Black for lighter mix, Titanium White for darker mix
+    excluded_colors = ['Black'] if light_mix else ['Titanium White']  # Avoid Mars Black for lighter mix, Titanium White for darker mix
 
     # Choose a base color if not provided
     if base_color is None:

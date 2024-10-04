@@ -42,7 +42,7 @@ export default class App extends Component {
   postColour = async (rgba) => {
     console.log('Posting colour to server:', rgba);  // Log the color being posted
     try {
-      const response = await axios.post('http://192.168.0.93:8030/post_colour', { colour: rgba });
+      const response = await axios.post('http://192.168.1.205:8030/post_colour', { colour: rgba });
 
       console.log('Response from server:', response.data);  // Log the response
       console.log('Full response from server:', response);
