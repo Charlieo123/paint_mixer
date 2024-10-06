@@ -3,6 +3,7 @@ from math import sqrt
 from scipy.optimize import minimize
 import numpy as np
 from flask_cors import CORS
+from skimage import color
 
 app = Flask(__name__)
 CORS(app)
@@ -18,7 +19,7 @@ available_colors = {
     'Phthalo Blue': {'rgba': (80, 144, 242, 0.95), 'lightfastness': 10},
     'Cerulean Blue': {'rgba': (0, 147, 248, 0.95), 'lightfastness': 10},
     'Cobalt Blue': {'rgba': (0, 130, 226, 0.95), 'lightfastness': 10},
-    'Perm Blue Violet': {'rgba': (84, 50, 92, 0.95), 'lightfastness': 10},
+    'Perm Blue Violet': {'rgba': (72, 11, 129, 1), 'lightfastness': 10},
     'Crimson Red': {'rgba': (255, 26, 26, 1), 'lightfastness': 7},
     'Carmine': {'rgba': (182, 0, 13, 1), 'lightfastness': 7},
     'Rose': {'rgba': (218, 58, 76, 0.95), 'lightfastness': 7},
@@ -36,19 +37,29 @@ available_colors = {
     'Vermilion': {'rgba': (244, 29, 4, 0.95), 'lightfastness': 7},
     'Viridian': {'rgba': (8, 54, 57, 0.95), 'lightfastness': 10},
     'Fluorescent Peach Red': {'rgba': (255, 112, 177, 0.95), 'lightfastness': 10},
-
-
 }
+
 color_names = list(available_colors.keys())
 
-def color_distance(color1, color2):
-    return sqrt(sum((a - b) ** 2 for a, b in zip(color1, color2)))
+def rgba_to_lab(rgba):
+    rgb = np.array(rgba[:3]) / 255.0
+    lab = color.rgb2lab(rgb[np.newaxis, np.newaxis, :])
+    return lab[0, 0, :]
 
-def find_closest_color(available_colors, target_rgba, exclude_colors=None):
+# Compute LAB values for available colors
+for color_name in available_colors:
+    rgba = available_colors[color_name]['rgba']
+    lab = rgba_to_lab(rgba)
+    available_colors[color_name]['lab'] = lab
+
+def color_distance(color1_lab, color2_lab):
+    return np.linalg.norm(color1_lab - color2_lab)
+
+def find_closest_color(available_colors, target_lab, exclude_colors=None):
     if exclude_colors is None:
         exclude_colors = []
     filtered_colors = {k: v for k, v in available_colors.items() if k not in exclude_colors}
-    return min(filtered_colors, key=lambda color: color_distance(available_colors[color]['rgba'], target_rgba))
+    return min(filtered_colors, key=lambda color: color_distance(available_colors[color]['lab'], target_lab))
 
 # Calculate lightfastness and transparency ratings for the mixed colors
 def calculate_lightfastness_and_transparency(mix_ratios):
@@ -83,36 +94,21 @@ def calculate_mixed_color(mix_ratios):
     mixed_alpha = round(mixed_alpha, 2)
     return tuple(mixed_rgb + [mixed_alpha])
 
-# Function to adjust brightness of the target RGBA
-def adjust_brightness(rgba, lighten=True, factor=0.1):
-    # Convert RGB to a scale of 0-255
-    r, g, b, a = rgba
+# Function to adjust lightness in LAB color space
+def adjust_lightness(lab, lighten=True, factor=0.1):
+    L, a, b = lab
     if lighten:
-        r = min(255, int(r + (255 - r) * factor))
-        g = min(255, int(g + (255 - g) * factor))
-        b = min(255, int(b + (255 - b) * factor))
+        L = min(100, L + factor * (100 - L))
     else:
-        r = max(0, int(r - r * factor))
-        g = max(0, int(g - g * factor))
-        b = max(0, int(b - b * factor))
-    return (r, g, b, a)
+        L = max(0, L - factor * L)
+    return np.array([L, a, b])
 
 # Function to select a subset of paints (3-4) closest to the target
-def select_paints(target_rgba, include_black=True, include_white=True, max_paints=4):
+def select_paints(target_lab, include_black=True, include_white=True, max_paints=4):
     selected_paints = []
     
-    # Include Mars Black or Titanium White based on target brightness
-    brightness = sum(target_rgba[:3]) / 3
-    if brightness < 128:
-        if 'Mars Black' in available_colors:
-            selected_paints.append('Mars Black')
-    else:
-        if 'Titanium White' in available_colors:
-            selected_paints.append('Titanium White')
-    
-    # Select the remaining paints based on color distance
-    remaining_paints = {k: v for k, v in available_colors.items() if k not in selected_paints}
-    sorted_paints = sorted(remaining_paints.keys(), key=lambda color: color_distance(available_colors[color]['rgba'], target_rgba))
+    # Select the paints based on color distance
+    sorted_paints = sorted(available_colors.keys(), key=lambda color: color_distance(available_colors[color]['lab'], target_lab))
     
     for color in sorted_paints:
         if len(selected_paints) >= max_paints:
@@ -121,25 +117,29 @@ def select_paints(target_rgba, include_black=True, include_white=True, max_paint
     
     return selected_paints
 
+
 # Optimization method to calculate mixing ratios for the actual color with limited paints
-def optimize_mixing_ratios(target_rgba, selected_paints, max_paints=4):
-    # Objective: Minimize the color distance between the mixed color and target_rgba
+def optimize_mixing_ratios(target_rgba, target_lab, selected_paints, max_paints=4):
+    # Objective: Minimize the color distance between the mixed color and target_lab
     # Variables: Ratios of each selected paint
     # Constraints:
     #   - Ratios >= 0
-    #   - Sum of ratios between 0.8 and 0.95
+    #   - Sum of ratios between 0.8 and 1.0
     #   - Number of paints used <= max_paints
-    
+        
     def objective(ratios):
-        mixed_rgb = np.dot(ratios, [available_colors[color]['rgba'][:3] for color in selected_paints])
-        mixed_alpha = np.dot(ratios, [available_colors[color]['rgba'][3] for color in selected_paints])
-        distance = sqrt(sum((mixed_rgb[i] - target_rgba[i]) ** 2 for i in range(3)) + (mixed_alpha - target_rgba[3]) ** 2)
+        colors = np.array([available_colors[color]['rgba'][:3] for color in selected_paints])
+        mixed_rgb = np.dot(ratios, colors)
+        mixed_rgb = np.clip(mixed_rgb, 0, 255)
+        mixed_rgb_norm = mixed_rgb / 255.0
+        mixed_lab = color.rgb2lab(mixed_rgb_norm[np.newaxis, np.newaxis, :])[0, 0, :]
+        distance = np.linalg.norm(mixed_lab - target_lab)
         return distance
 
     # Initial guess: equal distribution within constraints
     initial_guess = np.array([1.0 / len(selected_paints)] * len(selected_paints))
     initial_guess /= initial_guess.sum()
-    initial_guess *= 0.85  # Total ratio around 85%
+    initial_guess *= 0.9  # Total ratio around 90%
 
     # Bounds for each ratio: 0 to 1
     bounds = [(0, 1) for _ in selected_paints]
@@ -147,7 +147,7 @@ def optimize_mixing_ratios(target_rgba, selected_paints, max_paints=4):
     # Constraint for sum of ratios
     constraints = [
         {'type': 'ineq', 'fun': lambda x: x.sum() - 0.80},  # sum >= 0.80
-        {'type': 'ineq', 'fun': lambda x: 0.95 - x.sum()}   # sum <= 0.95
+        {'type': 'ineq', 'fun': lambda x: 1.0 - x.sum()}   # sum <= 1.0
     ]
 
     result = minimize(objective, initial_guess, method='SLSQP', bounds=bounds, constraints=constraints)
@@ -156,27 +156,27 @@ def optimize_mixing_ratios(target_rgba, selected_paints, max_paints=4):
         ratios = result.x
         # Round small ratios to zero
         ratios = np.where(ratios < 0.01, 0, ratios)
-        # Normalize again to ensure sum is within 0.80 and 0.95
+        # Normalize again to ensure sum is within 0.80 and 1.0
         total = ratios.sum()
         if total < 0.80:
             ratios += (0.80 - total) / len(ratios)
-        elif total > 0.95:
-            ratios *= 0.95 / total
+        elif total > 1.0:
+            ratios *= 1.0 / total
         mix_ratios = {color: round(ratios[i], 2) for i, color in enumerate(selected_paints) if ratios[i] > 0}
         return mix_ratios
     else:
         print("Optimization failed. Falling back to heuristic method.")
-        return heuristic_mixing_ratios(target_rgba)[0]
+        return heuristic_mixing_ratios(target_lab)[0]
 
 # Heuristic method to calculate mixing ratios for lighter and darker mixes
-def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared_color=None, max_paints=4):
+def heuristic_mixing_ratios(target_lab, light_mix=True, base_color=None, shared_color=None, max_paints=4):
     mix_ratios = {color: 0 for color in available_colors}
     color_order = []
-    excluded_colors = ['Black'] if light_mix else ['Titanium White']  # Avoid Mars Black for lighter mix, Titanium White for darker mix
+    excluded_colors = ['Black'] if light_mix else ['Titanium White']  # Avoid Black for lighter mix, Titanium White for darker mix
 
     # Choose a base color if not provided
     if base_color is None:
-        base_color = find_closest_color(available_colors, target_rgba, exclude_colors=excluded_colors)
+        base_color = find_closest_color(available_colors, target_lab, exclude_colors=excluded_colors)
 
     # Add shared color if provided
     if shared_color is None:
@@ -185,25 +185,21 @@ def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared
     mix_ratios[base_color] = 0.5 if light_mix else 0.55
     color_order.append(base_color)
 
-    base_rgba = available_colors[base_color]['rgba']
-    current_mix = [base_rgba[i] * mix_ratios[base_color] for i in range(3)]
-    current_alpha = base_rgba[3] * mix_ratios[base_color]
+    base_lab = available_colors[base_color]['lab']
+    current_mix_lab = base_lab * mix_ratios[base_color]
 
     # Add secondary color
-    remaining_target = [max(0, target_rgba[i] - current_mix[i]) for i in range(3)]
-    remaining_alpha = max(0, target_rgba[3] - current_alpha)
+    remaining_target_lab = target_lab - current_mix_lab
     secondary_color = find_closest_color(
         {k: v for k, v in available_colors.items() if k != base_color and k != shared_color and k not in excluded_colors},
-        (remaining_target[0], remaining_target[1], remaining_target[2], remaining_alpha),
+        target_lab,
         exclude_colors=excluded_colors
     )
     mix_ratios[secondary_color] = 0.2
     color_order.append(secondary_color)
 
-    secondary_rgba = available_colors[secondary_color]['rgba']
-    for i in range(3):
-        current_mix[i] += secondary_rgba[i] * mix_ratios[secondary_color]
-    current_alpha += secondary_rgba[3] * mix_ratios[secondary_color]
+    secondary_lab = available_colors[secondary_color]['lab']
+    current_mix_lab += secondary_lab * mix_ratios[secondary_color]
 
     # Add third color
     third_color_candidates = [color for color in available_colors if color not in (base_color, secondary_color, shared_color) and color not in excluded_colors]
@@ -212,10 +208,8 @@ def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared
         mix_ratios[third_color] = 0.1
         color_order.append(third_color)
 
-        third_rgba = available_colors[third_color]['rgba']
-        for i in range(3):
-            current_mix[i] += third_rgba[i] * mix_ratios[third_color]
-        current_alpha += third_rgba[3] * mix_ratios[third_color]
+        third_lab = available_colors[third_color]['lab']
+        current_mix_lab += third_lab * mix_ratios[third_color]
 
     # Add fourth color if needed
     if len(color_order) < max_paints:
@@ -225,10 +219,8 @@ def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared
             mix_ratios[fourth_color] = 0.05
             color_order.append(fourth_color)
 
-            fourth_rgba = available_colors[fourth_color]['rgba']
-            for i in range(3):
-                current_mix[i] += fourth_rgba[i] * mix_ratios[fourth_color]
-            current_alpha += fourth_rgba[3] * mix_ratios[fourth_color]
+            fourth_lab = available_colors[fourth_color]['lab']
+            current_mix_lab += fourth_lab * mix_ratios[fourth_color]
 
     # Adjust total ratios to ensure they're between 80% and 95%
     total_ratio = sum(mix_ratios.values())
@@ -248,6 +240,7 @@ def heuristic_mixing_ratios(target_rgba, light_mix=True, base_color=None, shared
     mix_ratios = {color: ratio for color, ratio in mix_ratios.items() if ratio > 0}
 
     return mix_ratios, color_order
+
 def parse_rgba_string(rgba_str):
     # Convert "rgba(166, 0, 255, 1)" to (166, 0, 255, 1.0)
     rgba_values = rgba_str.replace('rgba(', '').replace(')', '').split(',')
@@ -257,26 +250,27 @@ def parse_rgba_string(rgba_str):
 # Main function to generate all mixes
 def generate_mixes(target_rgba):
     output = {}
+    target_lab = rgba_to_lab(target_rgba)
 
-    # Generate Slightly Lighter Mix with reduced factor
-    lighter_rgba = adjust_brightness(target_rgba, lighten=True, factor=0.05)  # Reduced factor
-    light_mix_ratios, light_color_order = heuristic_mixing_ratios(lighter_rgba, light_mix=True)
+    # Generate Slightly Lighter Mix
+    lighter_lab = adjust_lightness(target_lab, lighten=True, factor=0.05)
+    light_mix_ratios, light_color_order = heuristic_mixing_ratios(lighter_lab, light_mix=True)
     lighter_mix = {
         'ratios': light_mix_ratios,
         'mixed_color': calculate_mixed_color(light_mix_ratios)
     }
 
     # Actual Mix using optimization
-    selected_paints = select_paints(target_rgba, include_black=True, include_white=True, max_paints=4)
-    actual_mix_ratios = optimize_mixing_ratios(target_rgba, selected_paints, max_paints=4)
+    selected_paints = select_paints(target_lab, include_black=True, include_white=True, max_paints=4)
+    actual_mix_ratios = optimize_mixing_ratios(target_rgba, target_lab, selected_paints, max_paints=4)
     actual_mix = {
         'ratios': actual_mix_ratios,
         'mixed_color': calculate_mixed_color(actual_mix_ratios)
     }
 
-    # Generate Slightly Darker Mix with reduced factor
-    darker_rgba = adjust_brightness(target_rgba, lighten=False, factor=0.05)  # Reduced factor
-    dark_mix_ratios, dark_color_order = heuristic_mixing_ratios(darker_rgba, light_mix=False)
+    # Generate Slightly Darker Mix
+    darker_lab = adjust_lightness(target_lab, lighten=False, factor=0.05)
+    dark_mix_ratios, dark_color_order = heuristic_mixing_ratios(darker_lab, light_mix=False)
     darker_mix = {
         'ratios': dark_mix_ratios,
         'mixed_color': calculate_mixed_color(dark_mix_ratios)
@@ -299,4 +293,4 @@ def handle_colour_post():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host= '0.0.0.0', port=8030)
+    app.run(debug=True, host='0.0.0.0', port=8030)
